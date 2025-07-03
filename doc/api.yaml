@@ -1,0 +1,1128 @@
+openapi: 3.0.1
+
+info:
+  title: WASAText API
+  version: 1.0.0
+  description: API per l'app di messaggistica WASAText
+
+servers:
+  - url: http://0.0.0.0:3000
+
+tags:
+  - name: "auth"
+    description: Login e registrazione utenti
+  - name: "user"
+    description: Gestione dell’utente autenticato e ricerca utenti
+  - name: "conversation"
+    description: Creazione, aggiornamento e gestione delle conversazioni (1:1 o gruppi)
+  - name: "message"
+    description: Invio, eliminazione e recupero dei messaggi nelle conversazioni
+  - name: "reaction"
+    description: Aggiunta, rimozione e lettura delle reazioni ai messaggi
+  - name: "status"
+    description: Stato dei messaggi (consegnato, visualizzato)
+
+
+security:
+  - bearerAuth: []
+
+
+paths:
+  /session:
+    post:
+      tags: 
+        - auth
+      summary: Login o registrazione utente
+      description: Esegue il login o registra un nuovo utente se non esiste già nel sistema.
+      operationId: doLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login avvenuto con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '201':
+          description: Registrazione avvenuta con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /user/me:
+    get:
+      tags:
+        - user
+      summary: Ottieni le informazioni dell’utente autenticato
+      description: Restituisce le generalità dell’utente attualmente autenticato, incluse UUID, username e URL foto profilo.
+      operationId: getMyUserInfo
+      responses:
+        '200':
+          description: Dati dell’utente autenticato restituiti con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /user/me/username:
+    put:
+      tags: 
+        - user
+      summary: Modifica lo username dell’utente autenticato
+      description: Permette all’utente autenticato di modificare il proprio username.
+      operationId: setMyUserName
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 16
+                  pattern: '^[a-zA-Z0-9_]+$'
+                  description: Nuovo username
+      responses:
+        '200':
+          description: Username aggiornato con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /user/me/photo:
+    put:
+      tags: 
+        - user
+      summary: Modifica la foto profilo dell’utente autenticato
+      description: Permette all’utente autenticato di aggiornare la propria foto profilo.
+      operationId: setMyPhoto
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - photo
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                  description: URL della nuova foto profilo
+      responses:
+        '200':
+          description: Foto profilo aggiornata con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /user/all:
+    get:
+      tags:
+        - user
+      summary: Recupera tutti gli utenti registrati
+      description: Restituisce una lista di tutti gli utenti attualmente registrati sulla piattaforma.
+      operationId: getAllUsers
+      responses:
+        '200':
+          description: Lista utenti restituita con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - users
+                properties:
+                  users:
+                    type: array
+                    minItems: 0
+                    maxItems: 200
+                    items:
+                      type: object
+                      properties:
+                        username:
+                          type: string
+                          example: "luca_dev"
+                        photoUrl:
+                          type: string
+                          example: "/user_photos/luca_dev.jpg"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /user:
+    get:
+      tags:
+        - user
+      summary: Cerca utenti per username
+      description: >-
+        Restituisce una lista di utenti il cui username contiene il testo specificato.
+      operationId: searchUsers
+      parameters:
+        - name: search
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 16
+            pattern: '^[a-zA-Z0-9_]+$'
+          description: Stringa da cercare all'interno degli username (case insensitive)
+      responses:
+        '200':
+          description: Lista utenti corrispondenti al criterio di ricerca
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - users
+                properties:
+                  users:
+                    type: array
+                    minItems: 0
+                    maxItems: 200
+                    items:
+                      type: object
+                      properties:
+                        username:
+                          type: string
+                          example: "luca_dev"
+                        photoUrl:
+                          type: string
+                          example: "/user_photos/luca_dev.jpg"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  
+  /conversations:
+    get:
+      tags:
+        - conversation
+      summary: Recupera tutte le conversazioni dell'utente autenticato
+      operationId: getMyConversations
+      responses:
+        '200':
+          description: Lista delle conversazioni dell'utente
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - conversations
+                properties:
+                  conversations:
+                    type: array
+                    minItems: 0
+                    maxItems : 50
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 42
+                          description: ID della conversazione
+                        isDirect:
+                          type: boolean
+                          example: true
+                          description: True se è una conversazione diretta 1:1
+                        groupName:
+                          type: string
+                          nullable: true
+                          example: "Amici del calcetto"
+                          description: Nome del gruppo, se presente
+                        groupPhoto:
+                          type: string
+                          nullable: true
+                          example: "/group_photos/42.png"
+                          description: URL della foto del gruppo, se presente
+                        usernamePeer:
+                          type: string
+                          nullable: true
+                          example: "mario_rossi"
+                          description: Username dell'interlocutore (solo per conversazioni dirette)
+                        photoUrlPeer:
+                          type: string
+                          nullable: true
+                          example: "/user_photos/123.jpg"
+                          description: URL della foto dell'interlocutore (solo per conversazioni dirette)
+                        lastMessageSent:
+                          type: string
+                          example: "Ci vediamo domani!"
+                          description: Ultimo messaggio inviato nella conversazione
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - conversation
+      summary: Crea una nuova conversazione privata o di gruppo
+      description: Crea una nuova conversazione diretta con un altro utente o un gruppo con più utenti specificati. Il chiamante sarà automaticamente aggiunto come membro.
+      operationId: createConversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConversationRequest'
+      responses:
+        '201':
+          description: Conversazione creata con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/{id}:
+    get:
+      tags:
+        - conversation
+      summary: Recupera i dettagli e i messaggi di una conversazione specifica
+      operationId: getConversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID della conversazione
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Dettagli della conversazione e lista dei messaggi
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - conversationDetail
+                  - messages
+                properties:
+                  conversationDetail:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      isDirect:
+                        type: boolean
+                        example: true
+                      groupName:
+                        type: string
+                        nullable: true
+                        example: "Team Devs"
+                      groupPhoto:
+                        type: string
+                        nullable: true
+                        example: "/group_photos/devs.png"
+                      usernamePeer:
+                        type: string
+                        nullable: true
+                        example: "luca_dev"
+                      photoUrlPeer:
+                        type: string
+                        nullable: true
+                        example: "/user_photos/luca_dev.jpg"
+                      numberMembers:
+                        type: integer
+                        example: 4
+                  messages:
+                    type: array
+                    minItems: 0
+                    maxItems: 100
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 101
+                        type:
+                          type: string
+                          example: "text"
+                          description: Tipo di messaggio (es. text, image, audio)
+                        content:
+                          type: string
+                          example: "Ciao a tutti!"
+                        mediaUrl:
+                          type: string
+                          nullable: true
+                          example: "/media/messages/101.jpg"
+                        timestamp:
+                          type: string
+                          format: date-time
+                          example: "2025-06-18T10:30:00Z"
+                        idRepliesTo:
+                          type: integer
+                          nullable: true
+                          example: 100
+                        replyToMessage:
+                          type: object
+                          nullable: true
+                          properties:
+                            type:
+                              type: string
+                              example: "text"
+                            content:
+                              type: string
+                              example: "Messaggio originale"
+                            mediaUrl:
+                              type: string
+                              nullable: true
+                              example: null
+                        uuidSender:
+                          type: string
+                          format: uuid
+                          example: "6e9f8a42-1234-5678-90ab-cdef12345678"
+                        usernameSender:
+                          type: string
+                          example: "mario_rossi"
+                        delivered:
+                          type: array
+                          minItems: 0
+                          maxItems: 50
+                          items:
+                            type: string
+                            format: uuid
+                            example: "bdf5f093-9d7a-4f76-a9d8-2c6899c5c0f2"
+                          description: Lista degli UUID degli utenti a cui il messaggio è stato consegnato
+                        seen:
+                          type: array
+                          minItems: 0
+                          maxItems: 50
+                          items:
+                            type: string
+                            format: uuid
+                            example: "bdf5f093-9d7a-4f76-a9d8-2c6899c5c0f2"
+                          description: Lista degli UUID degli utenti che hanno visto il messaggio
+                        reactions:
+                          type: array
+                          minItems: 0
+                          maxItems: 50
+                          items:
+                            type: string
+                            example: "👍"
+                          description: Lista di emoji usate come reazioni a questo messaggio
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /conversations/{id}/name:
+    put:
+      tags:
+        - conversation
+      summary: Modifica il nome del gruppo
+      description: >-
+        Permette all’utente autenticato di modificare il nome di una conversazione di gruppo.
+      operationId: setGroupName
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - groupName
+              properties:
+                groupName:
+                  type: string
+                  minLength: 3
+                  maxLength: 30
+                  pattern: '^[a-zA-Z0-9_]+$'
+                  description: Nuovo nome del gruppo
+      responses:
+        '200':
+          description: Nome del gruppo aggiornato con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/{id}/photo:
+    put:
+      tags:
+        - conversation
+      summary: Modifica la foto del gruppo
+      description: Permette all’utente autenticato di aggiornare la foto profilo di una conversazione di gruppo.
+      operationId: setGroupPhoto
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - photo
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                  description: Immagine della nuova foto profilo del gruppo      
+      responses:
+        '200':
+          description: Foto del gruppo aggiornata con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/{id}/members:
+    post:
+      tags:
+        - conversation
+      summary: Aggiunge uno o più membri a un gruppo esistente
+      description: Permette all’utente autenticato di aggiungere nuovi membri a una conversazione di gruppo, solo se ne fa già parte.
+      operationId: addToGroup
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMembersRequest'
+      responses:
+        '200':
+          description: Membri aggiunti con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - added
+                  - alreadyPresent
+                properties:
+                  added:
+                    type: array
+                    minItems: 0
+                    maxItems: 50
+                    items:
+                      $ref: '#/components/schemas/UUID'
+                    description: Lista degli UUID effettivamente aggiunti
+                  alreadyPresent:
+                    type: array
+                    minItems: 0
+                    maxItems: 50
+                    items:
+                      $ref: '#/components/schemas/UUID'
+                    description: Lista degli UUID già membri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/{id}/members/me:
+    delete:
+      tags:
+        - conversation
+      summary: L’utente autenticato abbandona un gruppo
+      description: Permette all’utente autenticato di lasciare una conversazione di gruppo. Se è l’ultimo membro, la conversazione viene automaticamente eliminata.
+      operationId: leaveGroup
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Uscita dal gruppo avvenuta con successo (o gruppo eliminato se era l’ultimo membro)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/{id}/messages:
+    post:
+      tags:
+        - message
+      summary: Invia un messaggio in una conversazione
+      description: L’utente autenticato invia un nuovo messaggio (testuale o con media) in una conversazione 1:1 o di gruppo a cui partecipa.
+      operationId: sendMessage
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        '201':
+          description: Messaggio inviato con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /messages/{id}:
+    delete:
+      tags:
+        - message
+      summary: Elimina un messaggio inviato
+      description: Elimina un messaggio inviato dall’utente autenticato. L’operazione è consentita solo per messaggi creati da lui.
+      operationId: deleteMessage
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Messaggio eliminato con successo
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /messages/{id}/forward:
+    post:
+      tags:
+        - message
+      summary: Inoltra un messaggio a un'altra conversazione
+      description: Permette all’utente autenticato di inoltrare un messaggio già inviato in una nuova conversazione (1:1 o di gruppo).
+      operationId: forwardMessage
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - idConversation
+              properties:
+                idConversation:
+                  $ref: '#/components/schemas/id'
+      responses:
+        '201':
+          description: Messaggio inoltrato con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /messages/{id}/reactions:
+    post:
+      tags:
+        - reaction
+      summary: Aggiunge una reazione a un messaggio
+      description: Permette all’utente autenticato di aggiungere una reazione (emoji) a un messaggio, se è membro della conversazione a cui appartiene il messaggio.
+      operationId: commentMessage
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReactToMessageRequest'
+      responses:
+        '201':
+          description: Reazione aggiunta con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /messages/{id}/reactions/me:
+    delete:
+      tags:
+        - reaction
+      summary: Rimuove la reazione dell’utente autenticato
+      description: Rimuove la reazione precedentemente aggiunta al messaggio da parte dell’utente autenticato. Funziona solo se l’utente aveva già reagito al messaggio.
+      operationId: uncommentMessage
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Reazione rimossa con successo
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /messages/{id}/status:
+    put:
+      tags:
+        - status
+      summary: Aggiorna lo stato del messaggio per l’utente autenticato
+      description: Imposta i campi `delivered` e/o `seen` a `true` per il messaggio specificato, per l’utente autenticato. Solo `true` è permesso (non si può annullare).
+      operationId: updateMessageStatus
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMessageStatusRequest'
+      responses:
+        '204':
+          description: Stato aggiornato con successo. Nessun contenuto restituito.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  responses:
+    BadRequest:
+      description: Dati non validi
+
+    Unauthorized:
+      description: Accesso negato (token mancante o non valido)
+
+    Forbidden:
+      description: Accesso negato (permessi insufficienti)
+
+    NotFound:
+      description: Risorsa non trovata
+
+    Conflict:
+      description: Richiesta in conflitto con lo stato attuale della risposta
+
+    InternalServerError:
+      description: Errore interno del server
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/id'
+      description: ID numerico della risorsa nella path
+
+  schemas:
+    UUID:
+      type: string
+      format: uuid
+      example: 6e9f8a42-1234-5678-90ab-cdef12345678
+      description: identificatore univoco utente
+    id:
+      type: integer
+      format: int32
+      description: ID univoco intero
+      minimum: 1
+      example: 389
+
+      
+    User:
+      type: object
+      required:
+        - uuid
+        - username
+      description: Identifica un utente
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          example: 6e9f8a42-1234-5678-90ab-cdef12345678
+          description: identificatore univoco utente
+        username:
+          type: string
+          minLength: 3
+          maxLength: 16
+          pattern: '^[a-zA-Z0-9_]+$'
+          description: Username dell'utente
+        photoUrl:
+          type: string
+          pattern: '^https?://.*'
+          example: 'https://www.example.com/imgs/photo.png'
+          description: URL della foto profilo dell’utente
+    Message:
+      type: object
+      required:
+        - id
+        - type
+        - content
+        - mediaUrl
+        - timestamp
+        - idConversation
+        - uuidSender
+      description: Identifica un messaggio
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          example: 389
+          description: ID univoco di un messaggio
+        type:
+          type: string
+          enum:
+          - text
+          - photo
+          description: indica il tipo di messaggio inviato 'text' per solo testuale 'photo' per l'invio di una foto con anche il testo (opzionale)
+          example: text
+        content:
+          type: string
+          minLength: 0
+          maxLength: 500
+          example: "Ciao a tutti! 😀"
+          description: Stringa contenente il contenuto testuale del messaggio
+          nullable: true
+        mediaUrl:
+          type: string
+          format: binary
+          nullable: true
+          description: Foto da inviare (può essere null)
+        timestamp:
+          type: string
+          format: date-time
+          example: '2025-05-30T14:45:00Z'
+          description: Data e ora di invio del messaggio
+        idRepliesTo:
+          type: integer
+          format: int32
+          example: 389
+          nullable: true
+          description: ID univoco del messaggio a cui si riferisce in caso di risposta ad un messaggio
+        idConversation:
+          type: integer
+          format: int32
+          minimum: 1
+          example: 389
+          description: ID della conversazione in cui il messaggio è stato mandato
+        uuidSender:
+          type: string
+          format: uuid
+          example: 6e9f8a42-1234-5678-90ab-cdef12345678
+          description: identificatore univoco utente che ha inviato il messaggio
+        idForwardedFrom:
+          type: integer
+          format: int32
+          example: 123
+          nullable: true
+          description: ID del messaggio originale se il messaggio è inoltrato
+    Reaction:
+      type: object
+      required:
+        - uuidUser
+        - idMessage
+        - emoji
+      description: Identifica una reazione ad un messaggio fatta da un determinato utente
+      properties:
+        uuidUser:
+          type: string
+          format: uuid
+          example: 6e9f8a42-1234-5678-90ab-cdef12345678
+          description: UUID dell’utente che ha inviato la reazione
+        idMessage:
+          type: integer
+          format: int32
+          minimum: 1
+          example: 389
+          description: ID del messaggio a cui è stata applicata la reazione
+        emoji:
+          type: string
+          description: >- 
+            Emoji Unicode singola (attenzione: alcune emoji possono essere composte da più codepoint).
+          example: "🔥"
+          minLength: 1
+          maxLength: 8
+
+    Conversation:
+      type: object
+      required:
+        - id
+        - timestampLastMessage
+        - isDirect
+        - groupName
+        - groupPhoto
+        - timestampCreated
+      description: Oggetto che determina la struttura di una conversazione sia 1:1 che gruppo
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+          example: 389
+          description: ID univoco di una conversazione
+        timestampLastMessage:
+          type: string
+          format: date-time
+          example: '2025-05-30T14:45:00Z'
+          description: Data e ora di invio dell'ultimo messaggio nella conversazione
+        isDirect:
+          type: boolean
+          description: True se la conversazione è una privata altrimenti False se si tratta di gruppo
+          example: true
+        groupName:
+          type: string
+          maxLength: 30
+          description: Nome dell'eventuale conversazione riferita ad un gruppo
+          nullable: true
+          example: 'Pasquetta2025'
+        groupPhoto:
+          type: string
+          format: url
+          description: Link alla foto caricata come foto profilo di un gruppo
+          example: 'https://www.example.com/imgs/photo.png'
+          nullable: true
+        timestampCreated:
+          type: string
+          format: date-time
+          example: '2025-05-30T14:45:00Z'
+          description: Data ora creazione della conversazione/gruppo
+        peerUsername:
+          type: string
+          nullable: true
+          description: Username dell’altro partecipante se è una conversazione 1:1
+          example: 'alby98'
+        peerPhoto:
+          type: string
+          format: url
+          nullable: true
+          description: Foto profilo dell’altro partecipante se è una conversazione 1:1
+          example: 'https://cdn.site.com/photos/alby.jpg'
+        lastMessageText:
+          type: string
+          nullable: true
+          description: Testo dell’ultimo messaggio inviato nella conversazione
+          example: 'Ci vediamo domani?'
+        lastMessageType:
+          type: string
+          nullable: true
+          description: Tipo dell’ultimo messaggio inviato (ad esempio 'text' o 'photo')
+          example: 'photo'
+
+
+
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 16
+          pattern: '^[a-zA-Z0-9_]+$'
+          description: Username scelto dall’utente
+
+    CreateConversationRequest:
+      type: object
+      required:
+        - isDirect
+        - members
+      properties:
+        isDirect:
+          type: boolean
+          description: 'True se è una chat privata, false se è un gruppo'
+          example: true
+        groupName:
+          type: string
+          maxLength: 30
+          description: Nome dell'eventuale conversazione riferita ad un gruppo
+          nullable: true
+          example: 'Pasquetta2025'
+        groupPhoto:
+          type: string
+          format: url
+          description: Link alla foto caricata come foto profilo di un gruppo
+          example: 'https://www.example.com/imgs/photo.png'
+          nullable: true
+        members:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+            example: 6e9f8a42-1234-5678-90ab-cdef12345678
+          description: Lista UUID degli altri membri, oppure solo la persona con cui fare conversazione direct
+    AddMembersRequest:
+      type: object
+      required:
+        - members
+      properties:
+        members:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+            example: 6e9f8a42-1234-5678-90ab-cdef12345678
+          description: Lista di UUID utenti da aggiungere al gruppo
+    SendMessageRequest:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - text
+            - photo
+          description: Tipo di messaggio
+          example: 'text'
+        content:
+          type: string
+          maxLength: 500
+          example: "Ciao a tutti! 😀"
+          description: Stringa contenente il contenuto testuale del messaggio
+          nullable: true
+        mediaUrl:
+          type: string
+          format: url
+          nullable: true
+          example: 'https://www.example.com/imgs/photo.png'
+          description: URL della foto da inviare (può essere null)
+        idRepliesTo:
+          type: integer
+          format: int32
+          example: 389
+          nullable: true
+          description: ID univoco del messaggio a cui si riferisce in caso di risposta ad un messaggio
+
+    ReactToMessageRequest:
+      type: object
+      required:
+        - emoji
+      properties:
+        emoji:
+          type: string
+          description: >- 
+           Emoji Unicode singola (attenzione: alcune emoji possono essere composte da più codepoint).
+          example: "🔥"
+          minLength: 1
+          maxLength: 8
+    UpdateMessageStatusRequest:
+      type: object
+      required:
+        - delivered
+        - seen
+      properties:
+        delivered:
+          type: boolean
+          description: Consegnato true o false
+          example: true
+        seen:
+          type: boolean
+          description: visualizzato true o false
+          example: true
+
+
+
+  
